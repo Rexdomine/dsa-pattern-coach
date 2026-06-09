@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DSA Pattern Coach — Instant Offline Mode</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="brand">
+        <div class="logo">⚡</div>
+        <div>
+          <div class="kicker">Rex Final Assessment Tool</div>
+          <h1>DSA Pattern Coach</h1>
+          <p>AI-first smart mode: paste a DSA question and the app asks Gemini/AI for a tailored answer first. If AI fails or is not configured, it clearly switches to Instant Engine fallback.</p>
+        </div>
+      </div>
+      <div class="badge">AI first • instant fallback</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>1. Paste the interview question</h2>
+        <div class="body">
+          <label class="label" for="problem">Problem statement</label>
+          <textarea id="problem" placeholder="Paste the DSA question here..."></textarea>
+          <div class="row">
+            <button class="btn" onclick="analyze()">AI Analyze + Solve</button>
+            <button class="btn secondary" onclick="clearAll()">Clear</button>
+            <button class="btn warn" onclick="copyCodexPrompt()">Copy Codex Prompt</button>
+          </div>
+          <p class="hint">This version is AI-first. It uses Gemini/AI for the best tailored answer, then falls back to the instant engine only if AI is unavailable or fails.</p>
+          <div class="templates" id="samples"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>2. Complete answer to perform</h2>
+        <div class="body" id="output">
+          <div class="pillbar">
+            <span class="pill">AI smart solver</span>
+            <span class="pill">Instant fallback</span>
+            <span class="pill">Full code</span>
+            <span class="pill">Speaking script</span>
+            <span class="pill">Challenge defense</span>
+          </div>
+          <p class="hint">Paste a question or click a sample. The app asks AI first; fallback answers are clearly labeled.</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer">Built for the Hiring Overseas / Wolff University Backend Software Engineer — AI Systems & Automation DSA round.</div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
