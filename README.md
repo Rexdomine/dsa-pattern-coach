@@ -12,6 +12,10 @@ A public, Vercel-ready DSA interview assistant for Rex.
   - `🧠 Source: AI Smart Solver`
   - `⚡ Source: Instant Engine Fallback`
 
+## Deploy with one click
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Rexdomine/dsa-pattern-coach&env=GEMINI_API_KEY,GEMINI_MODEL,GEMINI_BASE_URL&envDescription=Gemini%20settings%20for%20AI%20Smart%20Solver&envLink=https://aistudio.google.com/app/apikey)
+
 ## Required Vercel environment variables
 
 Set these in Vercel Project Settings → Environment Variables:
