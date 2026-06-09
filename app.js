@@ -285,8 +285,30 @@ sol('merge-intervals','Merge Intervals — End-to-End Solution','Intervals','Ove
 ];
 
 function norm(s){return (s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();}
-function esc(s){return String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
-function list(items){return (items||[]).map(x=>`<li>${esc(x)}</li>`).join('');}
+function valueToText(value){
+  if(value===null||value===undefined) return '';
+  if(typeof value==='string'||typeof value==='number'||typeof value==='boolean') return String(value);
+  if(Array.isArray(value)) return value.map(valueToText).filter(Boolean).join('\n');
+  if(typeof value==='object'){
+    return Object.entries(value).map(([k,v])=>{
+      const label=String(k).replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      const txt=valueToText(v);
+      return txt ? `${label}: ${txt}` : label;
+    }).join('\n');
+  }
+  return String(value);
+}
+function toListItems(items){
+  if(items===null||items===undefined) return [];
+  if(Array.isArray(items)) return items.flatMap(x=>{
+    if(x&&typeof x==='object'&&!Array.isArray(x)) return [valueToText(x)];
+    return [valueToText(x)];
+  }).filter(Boolean);
+  if(typeof items==='object') return Object.entries(items).map(([k,v])=>`${String(k).replace(/_/g,' ')}: ${valueToText(v)}`).filter(Boolean);
+  return String(items).split(/\n+/).map(s=>s.trim()).filter(Boolean);
+}
+function esc(s){return valueToText(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function list(items){return toListItems(items).map(x=>`<li>${esc(x)}</li>`).join('');}
 function copyText(t){navigator.clipboard.writeText(t||'');}
 function renderSamples(){document.getElementById('samples').innerHTML=SAMPLES.map(([id,title,text])=>`<button class="templateBtn" onclick="loadSample('${id}')"><b>${esc(title)}</b><span>${esc(text.slice(0,82))}...</span></button>`).join('');}
 function loadSample(id){const s=SAMPLES.find(x=>x[0]===id);document.getElementById('problem').value=s[2]; analyze();}
