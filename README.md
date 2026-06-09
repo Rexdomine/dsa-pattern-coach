@@ -1,58 +1,31 @@
-# DSA Pattern Coach — AI-First Gemini/Vercel App
+# DSA Pattern Coach — AI-First Hermes/Groot Brain
 
 A public, Vercel-ready DSA interview assistant for Rex.
 
 ## What it does
 
-- Frontend runs in the browser.
+- Frontend runs on Vercel.
 - `/api/analyze` runs as a Vercel Serverless Function.
-- The app asks Gemini first for a tailored answer.
-- If Gemini is missing, invalid, or times out, the browser uses the embedded Instant Engine fallback.
+- Vercel forwards the question to the Hermes/Groot brain running on the VPS.
+- Hermes/Groot returns a tailored DSA interview solution.
+- If the brain is unavailable or times out, the browser uses the embedded Instant Engine fallback.
 - Every result is clearly labeled:
   - `🧠 Source: AI Smart Solver`
   - `⚡ Source: Instant Engine Fallback`
-
-## Deploy with one click
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Rexdomine/dsa-pattern-coach&env=GEMINI_API_KEY,GEMINI_MODEL,GEMINI_BASE_URL&envDescription=Gemini%20settings%20for%20AI%20Smart%20Solver&envLink=https://aistudio.google.com/app/apikey)
 
 ## Required Vercel environment variables
 
 Set these in Vercel Project Settings → Environment Variables:
 
 ```bash
-GEMINI_API_KEY=your_google_ai_studio_key
-GEMINI_MODEL=gemini-1.5-flash
-GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+HERMES_BRAIN_URL=https://your-hermes-brain-url.example.com
+HERMES_BRAIN_TOKEN=your_shared_secret
 ```
 
-Get a Gemini key:
-
-```text
-https://aistudio.google.com/app/apikey
-```
-
-## Local run
-
-For static/frontend-only testing:
+## Local frontend run
 
 ```bash
 python3 -m http.server 8787
-```
-
-For Vercel API testing:
-
-```bash
-npm i -g vercel
-vercel dev
-```
-
-Create `.env.local` locally if using `vercel dev`:
-
-```bash
-GEMINI_API_KEY=your_key
-GEMINI_MODEL=gemini-1.5-flash
-GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 ```
 
 ## Deployment
@@ -66,9 +39,9 @@ vercel --prod
 - `index.html` — UI shell.
 - `style.css` — dark interview dashboard design.
 - `app.js` — AI-first frontend flow plus instant fallback engine.
-- `api/analyze.js` — Gemini serverless backend brain.
+- `api/analyze.js` — Vercel function that calls the Hermes/Groot brain.
 - `.env.example` — safe environment template.
 
 ## Security
 
-Do not commit real API keys. Use Vercel environment variables.
+Do not commit real brain tokens. Use Vercel environment variables.

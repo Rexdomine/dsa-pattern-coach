@@ -310,7 +310,7 @@ function solve(problem){const exact=detectExact(problem); if(exact) return {...e
 function codexPrompt(problem){return `AI assistance is allowed. Give me a complete end-to-end DSA interview solution for this problem:\n\n${problem}\n\nReturn: pattern, why, clarifying questions, brute force, optimized steps, full Python code, line-by-line narration while coding, tests, complexity, and challenge answers. Keep it simple and speakable.`;}
 function analyze(){const problem=document.getElementById('problem').value.trim(); if(!problem){clearAll();return;} showAiLoading(problem); smartTailor(problem);}
 function showAiLoading(problem){window.lastPrompt=codexPrompt(problem);document.getElementById('output').innerHTML=`
-<div class="sourceBanner aiSource"><div><b>🧠 Source: AI Smart Solver</b><p>Asking Gemini/AI for a tailored answer first. If the AI key is missing, invalid, or too slow, I will clearly switch to Instant Engine fallback.</p></div><div class="spinner">Thinking…</div></div>
+<div class="sourceBanner aiSource"><div><b>🧠 Source: AI Smart Solver</b><p>Asking Groot/Hermes on the VPS for a tailored answer first. If the Hermes brain is unavailable or too slow, I will clearly switch to Instant Engine fallback.</p></div><div class="spinner">Thinking…</div></div>
 <div class="sections">
   <div class="sec good"><h3>What is happening now?</h3><p>The app is not showing the generic instant answer yet. It is waiting for the AI response first so the final answer can be tailored to the exact question you pasted.</p></div>
   <div class="sec ai-box"><h3>Fallback safety</h3><p>If AI fails, the app will display a large <b>Source: Instant Engine Fallback</b> banner so you know at a glance the answer came from the local pattern engine.</p></div>
@@ -338,7 +338,7 @@ function fallbackResult(problem, reason){const r=solve(problem);return {...r,mod
 async function smartTailor(problem){
   try{
     const controller=new AbortController();
-    const timeout=setTimeout(()=>controller.abort(), 30000);
+    const timeout=setTimeout(()=>controller.abort(), 70000);
     const res=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({problem}),signal:controller.signal});
     clearTimeout(timeout);
     if(!res.ok) throw new Error('server returned '+res.status);
