@@ -308,7 +308,169 @@ function toListItems(items){
   return String(items).split(/\n+/).map(s=>s.trim()).filter(Boolean);
 }
 function esc(s){return valueToText(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function publicSpeakText(value){
+  let out=valueToText(value);
+  const reps=[
+    [/Time\s+O\(n\s*log\s*n\)/gi,'Time wise, sorting is the main cost'],
+    [/Space\s+O\(n\)/gi,'extra memory grows with the input'],
+    [/Space\s+O\(1\)/gi,'I only keep a few variables'],
+    [/O\(1\)\s*time/gi,'constant-time'],
+    [/O\(1\)\s*lookup/gi,'constant-time lookup'],
+    [/O\(n\s*log\s*n\)/gi,'sorting-level time'],
+    [/Time\s+O\(log\s*n\)/gi,'Time wise, it cuts the search range down quickly'],
+    [/O\(log\s*n\)/gi,'cuts the search down step by step'],
+    [/Time\s+O\(n\)/gi,'Time wise, I scan the input once'],
+    [/O\(n\)/gi,'linear time'],
+    [/Space\s+O\(1\)/gi,'I only keep a few variables'],
+    [/O\(1\)/gi,'constant time or space'],
+    [/O\(n\^2\)/gi,'much slower because it checks pairs repeatedly'],
+    [/\bLIFO\b/g,'last-in, first-out']
+  ];
+  reps.forEach(([rx,txt])=>{out=out.replace(rx,txt);});
+  out=out.replace('linear time into constant time or space','a quick constant-time check').replace('It turns complement lookup from a quick constant-time check','It makes complement lookup a quick constant-time check').replace('extra memory','Extra memory');
+  out=out.replace(/\butilize\b/gi,'use').replace(/\btherefore\b/gi,'so').replace(/\boptimal\b/gi,'cleaner');
+  return out.replace(/\s+/g,' ').trim();
+}
+function publicList(items){return toListItems(items).map(x=>`<li>${esc(publicSpeakText(x))}</li>`).join('');}
+function publicQaList(items){return toListItems(items).map(x=>`<li class="qaItem">${esc(publicSpeakText(x)).replace(/\n/g,'<br>')}</li>`).join('');}
+function findPythonCommentIndex(line){
+  let quote=null, escaped=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(escaped){escaped=false;continue;}
+    if(ch==='\\'){escaped=true;continue;}
+    if(quote){if(ch===quote) quote=null; continue;}
+    if(ch==='"'||ch==="'"){quote=ch;continue;}
+    if(ch==='#') return i;
+  }
+  return -1;
+}
+function splitCodeAndComment(line){
+  const commentAt=findPythonCommentIndex(line);
+  if(commentAt<0) return {code:line, comment:''};
+  return {code:line.slice(0, commentAt).replace(/\s+$/,''), comment:line.slice(commentAt).replace(/^#\s*/, '').trim()};
+}
+function cleanCodeOnly(code){
+  return String(code||'').split('\n').map(line=>splitCodeAndComment(line).code).join('\n').replace(/[ \t]+$/gm,'').trimEnd();
+}
+function codeTableHtml(code){
+  const lines=String(code||'').trim().split('\n');
+  return `<div class="codeGuide" id="codeBlock">${lines.map((line,i)=>{
+    const parts=splitCodeAndComment(line);
+    const isBlank=!parts.code.trim()&&!parts.comment;
+    return `<div class="codeLine ${isBlank?'blankLine':''}">
+      <div class="lineNo">Line ${i+1}</div>
+      <pre class="codeText">${esc(parts.code)||'&nbsp;'}</pre>
+      <div class="sayText">${parts.comment?`<span class="sayLabel">Say:</span> ${esc(parts.comment)}`:''}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+function detectCallableName(code){
+  const match=String(code||'').match(/def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/);
+  return match?match[1]:'solution_function';
+}
+function detectCallableParams(code){
+  const match=String(code||'').match(/def\s+[A-Za-z_][A-Za-z0-9_]*\s*\(([^)]*)\)/);
+  if(!match) return [];
+  return match[1].split(',').map(p=>p.trim().replace(/:.*/, '').replace(/=.*/, '').trim()).filter(p=>p && p!=='self' && p!=='cls');
+}
+function genericValueForParam(name, index){
+  const n=String(name||'').toLowerCase();
+  if(/nums|arr|array|list|values/.test(n)) return '[1, 2, 3, 4]';
+  if(/prices/.test(n)) return '[7, 1, 5, 3, 6, 4]';
+  if(/temperatures/.test(n)) return '[73, 74, 75, 71, 69, 72, 76, 73]';
+  if(/intervals/.test(n)) return '[[1, 3], [2, 6], [8, 10], [15, 18]]';
+  if(/grid|matrix|board/.test(n)) return '[["1", "1", "0"], ["1", "0", "0"], ["0", "0", "1"]]';
+  if(/^s$|string|word|text/.test(n)) return "'abcabcbb'";
+  if(/^t$/.test(n)) return "'bb'";
+  if(/target/.test(n)) return '5';
+  if(/^k$|count|limit/.test(n)) return '2';
+  if(/^n$|size|length/.test(n)) return '5';
+  if(/root|head|node/.test(n)) return 'None';
+  return index===0?'[1, 2, 3]':(index===1?'2':'1');
+}
+function simulatedArgsFromSignature(params, variant){
+  if(!params.length) return '';
+  const names=params.map(p=>p.toLowerCase());
+  if(params.length===1){
+    const n=names[0];
+    if(/nums|arr|array|list|values/.test(n)) return variant==='edge'?'[]':'[1, 2, 3, 4]';
+    if(/prices/.test(n)) return variant==='edge'?'[5]':'[7, 1, 5, 3, 6, 4]';
+    if(/temperatures/.test(n)) return variant==='edge'?'[80, 70, 60]':'[73, 74, 75, 71, 69, 72, 76, 73]';
+    if(/intervals/.test(n)) return variant==='edge'?'[[1, 4], [4, 5]]':'[[1, 3], [2, 6], [8, 10], [15, 18]]';
+    if(/grid|matrix|board/.test(n)) return variant==='edge'?'[]':'[["1", "1", "0"], ["1", "0", "0"], ["0", "0", "1"]]';
+    if(/^s$|string|word|text/.test(n)) return variant==='edge'?"''":"'abcabcbb'";
+    if(/^n$|size|length/.test(n)) return variant==='edge'?'0':'5';
+    if(/root|head|node/.test(n)) return 'None';
+  }
+  if(params.length===2){
+    if(names.includes('nums') && names.includes('k')) return variant==='edge'?'[1, -1, 0], 0':'[1, 1, 1], 2';
+    if(names.includes('nums') && names.includes('target')) return variant==='edge'?'[3, 3], 6':'[2, 7, 11, 15], 9';
+    if((names.includes('s') && names.includes('t')) || names.some(n=>/word/.test(n))) return variant==='edge'?"'', ''":"'anagram', 'nagaram'";
+    if(names.some(n=>/target/.test(n))) return params.map((p,i)=>/target/i.test(p)?'5':genericValueForParam(p,i)).join(', ');
+    if(names.some(n=>/^k$|count|limit/.test(n))) return params.map((p,i)=>/^k$|count|limit/i.test(p)?'2':genericValueForParam(p,i)).join(', ');
+  }
+  return params.map((p,i)=>genericValueForParam(p,i)).join(', ');
+}
+function linkedListHelperBlock(cleanCode){
+  const hasListNode=/class\s+ListNode\b/.test(cleanCode);
+  return `${hasListNode?'':'\nclass ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n'}\ndef build_linked_list(values):\n    dummy = ListNode(0)\n    current = dummy\n    for value in values:\n        current.next = ListNode(value)\n        current = current.next\n    return dummy.next\n\ndef linked_list_to_list(head):\n    values = []\n    current = head\n    while current:\n        values.append(current.val)\n        current = current.next\n    return values`;
+}
+function terminalTestBlock(r, cleanCode){
+  const title=norm(r.title||'');
+  const fn=detectCallableName(cleanCode);
+  const fnNorm=norm(fn);
+  const params=detectCallableParams(cleanCode);
+  const usesClass=/class\s+Solution\b/.test(cleanCode);
+  const call=(args)=>usesClass?`Solution().${fn}(${args})`:`${fn}(${args})`;
+  let cases=[];
+  let helperBlock='';
+  if(fnNorm.includes('mergeklists') || title.includes('merge k') || title.includes('linked list')){
+    helperBlock=linkedListHelperBlock(cleanCode);
+    if(fnNorm.includes('mergeklists') || title.includes('merge k')) cases=[`print('Test 1:', linked_list_to_list(${call('[build_linked_list([1, 4, 5]), build_linked_list([1, 3, 4]), build_linked_list([2, 6])]')}), 'Expected: [1, 1, 2, 3, 4, 4, 5, 6]')`,`print('Edge empty lists:', linked_list_to_list(${call('[]')}), 'Expected: []')`,`print('One list:', linked_list_to_list(${call('[build_linked_list([1, 2, 3])]')}), 'Expected: [1, 2, 3]')`];
+    else if(fnNorm.includes('reverse')) cases=[`print('Test 1:', linked_list_to_list(${call('build_linked_list([1, 2, 3, 4, 5])')}), 'Expected: [5, 4, 3, 2, 1]')`,`print('Edge empty:', linked_list_to_list(${call('None')}), 'Expected: []')`,`print('One node:', linked_list_to_list(${call('build_linked_list([7])')}), 'Expected: [7]')`];
+    else cases=[`print('Linked-list sample:', linked_list_to_list(${call('build_linked_list([1, 2, 3])')}), 'Expected: compare with the rule in the prompt')`,`print('Linked-list edge empty:', linked_list_to_list(${call('None')}), 'Expected: confirm the edge behavior from the prompt')`];
+  }
+  else if(title.includes('two sum')) cases=[`print('Test 1:', ${call('[2, 7, 11, 15], 9')}, 'Expected: [0, 1]')`,`print('Test 2:', ${call('[3, 2, 4], 6')}, 'Expected: [1, 2]')`,`print('Edge duplicate:', ${call('[3, 3], 6')}, 'Expected: [0, 1]')`];
+  else if(title.includes('valid parentheses')) cases=[`print('Test 1:', ${call("'()[]{}'")}, 'Expected: True')`,`print('Test 2:', ${call("'([)]'")}, 'Expected: False')`,`print('Edge empty:', ${call("''")}, 'Expected: True')`];
+  else if(title.includes('contains duplicate')) cases=[`print('Test 1:', ${call('[1, 2, 3, 1]')}, 'Expected: True')`,`print('Test 2:', ${call('[1, 2, 3, 4]')}, 'Expected: False')`,`print('Edge empty:', ${call('[]')}, 'Expected: False')`];
+  else if(title.includes('valid anagram')) cases=[`print('Test 1:', ${call("'anagram', 'nagaram'")}, 'Expected: True')`,`print('Test 2:', ${call("'rat', 'car'")}, 'Expected: False')`,`print('Edge empty:', ${call("'', ''")}, 'Expected: True')`];
+  else if(title.includes('palindrome')) cases=[`print('Test 1:', ${call("'A man, a plan, a canal: Panama'")}, 'Expected: True')`,`print('Test 2:', ${call("'race a car'")}, 'Expected: False')`,`print('Edge empty:', ${call("''")}, 'Expected: True')`];
+  else if(title.includes('buy')||title.includes('stock')) cases=[`print('Test 1:', ${call('[7, 1, 5, 3, 6, 4]')}, 'Expected: 5')`,`print('Test 2:', ${call('[7, 6, 4, 3, 1]')}, 'Expected: 0')`,`print('Edge one day:', ${call('[5]')}, 'Expected: 0')`];
+  else if(title.includes('longest substring')) cases=[`print('Test 1:', ${call("'abcabcbb'")}, 'Expected: 3')`,`print('Test 2:', ${call("'bbbbb'")}, 'Expected: 1')`,`print('Edge empty:', ${call("''")}, 'Expected: 0')`];
+  else if(title.includes('daily temperatures')) cases=[`print('Test 1:', ${call('[73,74,75,71,69,72,76,73]')}, 'Expected: [1,1,4,2,1,1,0,0]')`,`print('Edge descending:', ${call('[80,70,60]')}, 'Expected: [0,0,0]')`];
+  else if(title.includes('binary search')) cases=[`print('Test 1:', ${call('[-1,0,3,5,9,12], 9')}, 'Expected: 4')`,`print('Test 2:', ${call('[-1,0,3,5,9,12], 2')}, 'Expected: -1')`,`print('Edge empty:', ${call('[], 2')}, 'Expected: -1')`];
+  else if(title.includes('merge intervals')) cases=[`print('Test 1:', ${call('[[1,3],[2,6],[8,10],[15,18]]')}, 'Expected: [[1,6],[8,10],[15,18]]')`,`print('Touching:', ${call('[[1,4],[4,5]]')}, 'Expected: [[1,5]]')`];
+  else if(title.includes('product of array')) cases=[`print('Test 1:', ${call('[1,2,3,4]')}, 'Expected: [24,12,8,6]')`,`print('With zero:', ${call('[-1,1,0,-3,3]')}, 'Expected: [0,0,9,0,0]')`];
+  else {
+    const sampleArgs=simulatedArgsFromSignature(params, 'sample');
+    const edgeArgs=simulatedArgsFromSignature(params, 'edge');
+    cases=[
+      `print('Simulated sample:', ${call(sampleArgs)}, 'Expected: compare with the rule in the prompt')`,
+      `print('Simulated edge case:', ${call(edgeArgs)}, 'Expected: confirm the edge behavior from the prompt')`,
+      `print('Repeat check:', ${call(sampleArgs)}, 'Expected: same result as simulated sample')`
+    ];
+  }
+  const extraHelpers=helperBlock?`\n\n${helperBlock}`:'';
+  return `${cleanCode}${extraHelpers}\n\nif __name__ == "__main__":\n    # Ready-made tests: run this file with python3 solution.py.\n    # These are concrete simulated inputs you can run immediately.\n    ${cases.join('\n    ')}`;
+}
+function terminalGuideHtml(r, cleanCode){
+  const testBlock=terminalTestBlock(r, cleanCode);
+  window.lastTerminalTestBlock=testBlock;
+  const steps=[
+    {cmd:'python3 --version', say:'Checks that Python is installed in the terminal.', result:'You should see something like Python 3.x.x. If not, the environment may use python instead of python3.'},
+    {cmd:'nano solution.py', say:'Opens a small terminal editor so you can paste your code into a file named solution.py.', result:'Paste the clean code, then save with Ctrl+O, Enter, and exit with Ctrl+X.'},
+    {cmd:'python3 solution.py', say:'Runs the file and executes the test cases at the bottom.', result:'You should see each printed result beside its Expected value.'},
+    {cmd:'python3 -m py_compile solution.py', say:'Checks for syntax/indentation errors without running the whole program.', result:'No output means syntax is okay. If there is an error, Python shows the exact line to fix.'}
+  ];
+  return `<div class="terminalGuide">
+    <div class="terminalIntro"><p>Use this if the interviewer asks you to run your code in a terminal. First save the code, then run sample, edge, and worst-case tests.</p><button class="copy" onclick="copyText(window.lastTerminalTestBlock)">Copy code + test runner</button></div>
+    ${steps.map((s,i)=>`<div class="terminalStep"><div class="termNo">Step ${i+1}</div><div><div class="termLabel">Command to type</div><pre class="termCmd">${esc(s.cmd)}</pre><div class="termExplain"><b>What it does:</b> ${esc(s.say)}<br><b>Expected outcome:</b> ${esc(s.result)}</div></div></div>`).join('')}
+    <div class="terminalStep"><div class="termNo">Tests</div><div><div class="termLabel">Copy this into solution.py if you want ready-made tests</div><pre class="termCmd">${esc(testBlock)}</pre><div class="termExplain"><b>How to test different cases:</b> change the values inside the print lines, then run <code>python3 solution.py</code> again. Try normal sample cases, empty input, duplicates, no-answer cases, and the largest input shape the prompt allows.</div></div></div>
+  </div>`;
+}
 function list(items){return toListItems(items).map(x=>`<li>${esc(x)}</li>`).join('');}
+function qaList(items){return toListItems(items).map(x=>`<li class="qaItem">${esc(x).replace(/\n/g,'<br>')}</li>`).join('');}
 function copyText(t){navigator.clipboard.writeText(t||'');}
 function renderSamples(){document.getElementById('samples').innerHTML=SAMPLES.map(([id,title,text])=>`<button class="templateBtn" onclick="loadSample('${id}')"><b>${esc(title)}</b><span>${esc(text.slice(0,82))}...</span></button>`).join('');}
 function loadSample(id){const s=SAMPLES.find(x=>x[0]===id);document.getElementById('problem').value=s[2]; analyze();}
@@ -329,7 +491,7 @@ function genericSolution(pattern, problem){
  return {...base,title:`Generic ${pattern.name} Route — Adapt to Exact Prompt`,why:pattern.why,confidenceNote:'Pattern fallback: use this route immediately, then adapt return value/condition to prompt wording.'};
 }
 function solve(problem){const exact=detectExact(problem); if(exact) return {...exact.item, mode:'EXACT LOCAL', confidence:Math.min(99,exact.score), signals: exact.item.aliases}; const pat=detectPattern(problem); return {...genericSolution(pat,problem), mode:'PATTERN LOCAL', confidence:pat.score, signals:pat.hits};}
-function codexPrompt(problem){return `AI assistance is allowed. Give me a complete end-to-end DSA interview solution for this problem:\n\n${problem}\n\nReturn: pattern, why, clarifying questions, brute force, optimized steps, full Python code, line-by-line narration while coding, tests, complexity, and challenge answers. Keep it simple and speakable.`;}
+function codexPrompt(problem){return `AI assistance is allowed. Give me a complete end-to-end DSA interview solution for this problem:\n\n${problem}\n\nReturn: pattern, why, clarifying questions, brute force, optimized steps, full Python code with short natural inline comments beside meaningful lines, natural first-person narration while coding, tests, complexity, and challenge answers. Outside the code-writing section, make the wording sound like I am explaining it naturally off my head: simple, confident, not too technical, and not robotic. Avoid saying formulas out loud first; explain them as "one pass", "fast lookup", "keeps a small stack/map", then mention Big-O only briefly if needed. For challenge answers, include realistic interviewer curveball questions and exactly what I should say back, formatted as: Interviewer may ask: ... / Your answer: ...`;}
 function analyze(){const problem=document.getElementById('problem').value.trim(); if(!problem){clearAll();return;} showAiLoading(problem); smartTailor(problem);}
 function showAiLoading(problem){window.lastPrompt=codexPrompt(problem);document.getElementById('output').innerHTML=`
 <div class="sourceBanner aiSource"><div><b>🧠 Source: AI Smart Solver</b><p>Asking Groot/Hermes on the VPS for a tailored answer first. If the Hermes brain is unavailable or too slow, I will clearly switch to Instant Engine fallback.</p></div><div class="spinner">Thinking…</div></div>
@@ -337,25 +499,51 @@ function showAiLoading(problem){window.lastPrompt=codexPrompt(problem);document.
   <div class="sec good"><h3>What is happening now?</h3><p>The app is not showing the generic instant answer yet. It is waiting for the AI response first so the final answer can be tailored to the exact question you pasted.</p></div>
   <div class="sec ai-box"><h3>Fallback safety</h3><p>If AI fails, the app will display a large <b>Source: Instant Engine Fallback</b> banner so you know at a glance the answer came from the local pattern engine.</p></div>
 </div>`;}
-function render(r, problem){window.lastPrompt=codexPrompt(problem);const isAi=(r.mode||'').includes('SMART AI');const sourceTitle=isAi?'🧠 Source: AI Smart Solver':'⚡ Source: Instant Engine Fallback';const sourceText=isAi?'This answer was generated by the configured AI model and tailored to the exact pasted question.':'AI did not return a usable answer, so this came from the local embedded pattern engine. Treat it as a fallback route, not a fully intelligent tailored answer.';const conf=Number.isFinite(Number(r.confidence))?`${esc(r.confidence)}%`:esc(r.confidence||'tailored');document.getElementById('output').innerHTML=`
+function codeWithInlineNotes(code){
+  if(!code) return '';
+  const lines=String(code).trim().split('\n');
+  const meaningful=lines.filter(l=>l.trim() && !l.trim().startsWith('#'));
+  const withComments=meaningful.filter(l=>l.includes('#'));
+  if(meaningful.length && withComments.length/meaningful.length>0.55) return String(code).trim();
+  function note(s){
+    if(/^def\s+/.test(s)) return 'I match the function signature the prompt expects.';
+    if(/^class\s+Solution/.test(s)) return 'I keep the standard interview platform wrapper.';
+    if(/^seen\s*=/.test(s)) return 'I remember what I have already passed for fast lookup.';
+    if(/^stack\s*=/.test(s)) return 'This keeps unresolved items until a later value matches them.';
+    if(/^left/.test(s) || /^right/.test(s)) return 'This sets the boundary for my window or search range.';
+    if(/^for\s+/.test(s)) return 'I scan through the input once and update state as I go.';
+    if(/^while\s+/.test(s)) return 'I keep adjusting until the current condition is valid.';
+    if(/^if\s+/.test(s)) return 'This checks the key condition from the prompt.';
+    if(/^return\s+/.test(s)) return 'I return exactly the format the question asks for.';
+    if(/=/.test(s)) return 'I store this value so the next step stays simple.';
+    return 'This keeps the chosen pattern moving forward.';
+  }
+  return lines.map(line=>{
+    const s=line.trim();
+    if(!s || s.startsWith('#') || line.includes('#')) return line;
+    return `${line}  # ${note(s)}`;
+  }).join('\n');
+}
+function render(r, problem){window.lastPrompt=codexPrompt(problem);const isAi=(r.mode||'').includes('SMART AI');const sourceTitle=isAi?'🧠 Source: AI Smart Solver':'⚡ Source: Instant Engine Fallback';const sourceText=isAi?'This answer was generated by the configured AI model and tailored to the exact pasted question.':'AI did not return a usable answer, so this came from the local embedded pattern engine. Treat it as a fallback route, not a fully intelligent tailored answer.';const conf=Number.isFinite(Number(r.confidence))?`${esc(r.confidence)}%`:esc(r.confidence||'tailored');const displayCode=codeWithInlineNotes(r.code);window.lastDisplayCode=displayCode;window.lastCleanCode=cleanCodeOnly(displayCode);document.getElementById('output').innerHTML=`
 <div class="sourceBanner ${isAi?'aiSource':'fallbackSource'}"><div><b>${sourceTitle}</b><p>${sourceText}</p></div><div class="sourcePill">${esc(r.mode)}</div></div>
-<div class="result-head"><div class="metric"><div class="small">Solution</div><div class="big">${esc(r.title)}</div><div class="hint">${esc(r.confidenceNote||'Instant local solution from embedded pattern library')}</div></div><div class="metric"><div class="small">Pattern</div><div class="big">${esc(r.pattern)}</div><div class="hint">Signals: ${(r.signals||[]).map(esc).join(', ')||'pattern words'}</div></div><div class="metric"><div class="small">Mode</div><div class="big confidence">${esc(r.mode)}</div><div class="hint">Confidence: ${conf}</div></div></div>
+<div class="result-head"><div class="metric"><div class="small">Solution</div><div class="big">${esc(r.title)}</div><div class="hint">${esc(publicSpeakText(r.confidenceNote||'Instant local solution from embedded pattern library'))}</div></div><div class="metric"><div class="small">Pattern</div><div class="big">${esc(r.pattern)}</div><div class="hint">Signals: ${(r.signals||[]).map(esc).join(', ')||'pattern words'}</div></div><div class="metric"><div class="small">Mode</div><div class="big confidence">${esc(r.mode)}</div><div class="hint">Confidence: ${conf}</div></div></div>
 <div class="sections">
-<div class="sec good"><h3>🎙️ Opening script</h3><p>Let me restate the problem first. I believe this is a <b>${esc(r.pattern)}</b> problem. I’ll first explain the brute-force approach, then implement the optimized solution, test edge cases, and explain time and space complexity.</p></div>
-<div class="sec"><h3>🧩 Why this pattern fits</h3><p>${esc(r.why)}</p></div>
-<div class="sec"><h3>❓ Clarifying questions</h3><ul>${list(['Can the input be empty?','Should I return values, indices, a count, a boolean, or a modified structure?','Are duplicates, negative numbers, or special characters allowed?','Is the input sorted, and am I allowed to mutate it?','What should I return if there is no valid answer?'])}</ul></div>
-<div class="sec"><h3>🐢 Brute force</h3><p>${esc(r.brute)}</p></div>
-<div class="sec"><h3>🚀 Execution steps</h3><ol>${list(r.steps)}</ol></div>
-<div class="sec ai-box"><h3>💻 Full code to write <button class="copy" onclick="copyText(document.getElementById('codeBlock').innerText)">Copy code</button></h3><div id="codeBlock" class="code">${esc(r.code)}</div></div>
-<div class="sec"><h3>🗣️ What to say while coding</h3><ol>${list(r.lines)}</ol></div>
+<div class="sec good"><h3>🎙️ Opening script</h3><p>${esc(publicSpeakText(r.openingScript || `Let me restate this first in my own words. I’m reading it as a ${r.pattern} problem, so I’ll explain the simple idea, code the cleaner version, and test it with the sample.`))}</p></div>
+<div class="sec"><h3>🧩 Why this pattern fits</h3><p>${esc(publicSpeakText(r.why))}</p></div>
+<div class="sec"><h3>❓ Clarifying questions</h3><ul>${publicList(['Can the input be empty?','Should I return values, indices, a count, a boolean, or a modified structure?','Are duplicates, negative numbers, or special characters allowed?','Is the input sorted, and am I allowed to mutate it?','What should I return if there is no valid answer?'])}</ul></div>
+<div class="sec"><h3>🐢 Brute force</h3><p>${esc(publicSpeakText(r.brute))}</p></div>
+<div class="sec"><h3>🚀 Execution steps</h3><ol>${publicList(r.steps)}</ol></div>
+<div class="sec ai-box"><h3>💻 Full code to write — beginner line guide <button class="copy" onclick="copyText(window.lastCleanCode)">Copy clean code</button><button class="copy" onclick="copyText(window.lastDisplayCode)">Copy with notes</button></h3><p class="hint">Write the white code from each numbered line. Use the green <b>Say</b> column as your speaking cue — it is separated so it does not get mixed into the code.</p>${codeTableHtml(displayCode)}</div>
+<div class="sec good"><h3>🖥️ How to run and test this in terminal</h3><p class="hint">Beginner-safe commands for when the interviewer asks you to run your solution and prove it works.</p>${terminalGuideHtml(r, window.lastCleanCode)}</div>
+<div class="sec"><h3>🗣️ Backup speaking notes</h3><ol>${list(r.lines)}</ol></div>
 <div class="sec"><h3>🧪 Manual tests</h3><ul>${list(r.tests)}</ul></div>
-<div class="sec"><h3>⏱️ Complexity</h3><p>${esc(r.complexity)}</p></div>
-<div class="sec"><h3>🛡️ If interviewer challenges you</h3><ul>${list(r.challenges)}</ul></div>
+<div class="sec"><h3>⏱️ Complexity</h3><p>${esc(publicSpeakText(r.complexity))}</p></div>
+<div class="sec"><h3>🛡️ Interviewer curveball Q&A</h3><p class="hint">These are sample challenge questions the interviewer may ask for this exact problem, plus the answer to say back confidently.</p><ul>${publicQaList(r.challenges)}</ul></div>
 <div class="sec good" id="smartStatus"><h3>🧠 Source status</h3><p>The top banner tells you whether this answer came from AI Smart Solver or Instant Engine fallback.</p></div>
 <div class="sec ai-box"><h3>🤖 Optional Codex prompt <button class="copy" onclick="copyCodexPrompt()">Copy prompt</button></h3><div class="code">${esc(window.lastPrompt)}</div></div>
 <div class="sec danger"><h3>⚠️ Source rule</h3><p>The app tries AI first. If AI fails, times out, or is not configured, it switches to Instant Engine fallback and shows a clear source banner at the top.</p></div>
 </div>`;}
-function normalizeSmart(data){return {title:data.title||'AI-Tailored DSA Solution', pattern:data.pattern||'Detected by AI', mode:'SMART AI', confidence: data.model_used || 'tailored', confidenceNote:data.confidence_note||'Question-specific solution generated by fast AI mode', signals:[data.model_used||'AI'], why:data.why_pattern||'', brute:data.brute_force||'', steps:data.optimized_steps||[], code:data.code||'', lines:data.line_by_line||[], tests:data.tests||[], complexity:data.complexity||'', challenges:data.challenge_answers||[]};}
+function normalizeSmart(data){return {title:data.title||'AI-Tailored DSA Solution', pattern:data.pattern||'Detected by AI', mode:'SMART AI', confidence: data.model_used || 'tailored', confidenceNote:data.confidence_note||'Question-specific solution generated by fast AI mode', openingScript:data.opening_script||'', signals:[data.model_used||'AI'], why:data.why_pattern||'', brute:data.brute_force||'', steps:data.optimized_steps||[], code:data.code||'', lines:data.line_by_line||[], tests:data.tests||[], complexity:data.complexity||'', challenges:data.challenge_answers||[]};}
 function fallbackResult(problem, reason){const r=solve(problem);return {...r,mode:'INSTANT FALLBACK',confidenceNote:reason||'AI did not return a usable tailored answer, so this is from the local pattern engine.'};}
 async function smartTailor(problem){
   try{
